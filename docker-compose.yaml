@@ -5,13 +5,10 @@ x-common-service: &common-service
   # uncomment the build: statement and comment out the image: statement
   # image: ghcr.io/firecrawl/firecrawl
   build: apps/api
-
   ulimits:
     nofile:
       soft: 65535
       hard: 65535
-  networks:
-    - backend
   extra_hosts:
     - "host.docker.internal:host-gateway"
 
@@ -57,23 +54,22 @@ services:
       PROXY_USERNAME: ${PROXY_USERNAME}
       PROXY_PASSWORD: ${PROXY_PASSWORD}
       BLOCK_MEDIA: ${BLOCK_MEDIA}
-    networks:
-      - backend
 
   api:
     <<: *common-service
     environment:
       <<: *common-env
       HOST: "0.0.0.0"
-      PORT: ${INTERNAL_PORT:-3002}
+      PORT: ${PORT:-3002}
       WORKER_PORT: ${WORKER_PORT:-3005}
       ENV: local
     depends_on:
       - redis
       - playwright-service
-    ports:
-      - "${PORT:-3002}:${INTERNAL_PORT:-3002}"
     command: node dist/src/harness.js --start-docker
+    # Coolify will automatically expose this service if it's the main application
+    expose:
+      - "3002"
 
   redis:
     # NOTE: If you want to use Valkey (open source) instead of Redis (source available),
@@ -81,9 +77,6 @@ services:
     # Using Valkey with Firecrawl is untested and not guaranteed to work. Use with caution.
     image: redis:alpine
     # image: valkey/valkey:alpine
-
-    networks:
-      - backend
     command: redis-server --bind 0.0.0.0
   
   nuq-postgres:
@@ -92,11 +85,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-    networks:
-      - backend
-    ports:
-      - "5432:5432"
-
-networks:
-  backend:
-    driver: bridge
+    # Internal database access only - no external ports needed
+    expose:
+      - "5432"
